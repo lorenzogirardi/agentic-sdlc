@@ -140,7 +140,7 @@ class ToolRunner:
         return ToolResult(
             command=command,
             args=args,
-            exit_code=proc.returncode or -1,
+            exit_code=proc.returncode if proc.returncode is not None else -1,
             stdout=stdout,
             stderr=stderr,
             duration_ms=duration_ms,
