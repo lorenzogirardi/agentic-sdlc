@@ -1,0 +1,38 @@
+services:
+  sdlc:
+    build: .
+    container_name: agentic-sdlc
+    environment:
+      - OPENCODE_BASE_URL=${OPENCODE_BASE_URL:-}
+      - OPENCODE_API_KEY=${OPENCODE_API_KEY:-}
+      - OPENCODE_MODEL=${OPENCODE_MODEL:-deepseek-v4-flash-free}
+      - TRELLO_API_KEY=${TRELLO_API_KEY:-}
+      - TRELLO_TOKEN=${TRELLO_TOKEN:-}
+      - TRELLO_BOARD_ID=${TRELLO_BOARD_ID:-}
+      - TRELLO_LIST_ID=${TRELLO_LIST_ID:-}
+      - TRELLO_RUN_LABEL_ID=${TRELLO_RUN_LABEL_ID:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_OWNER=${GITHUB_OWNER:-}
+      - GITHUB_REPOSITORY=${GITHUB_REPOSITORY:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - PROMETHEUS_PORT=${PROMETHEUS_PORT:-9464}
+      - DRY_RUN=${DRY_RUN:-true}
+      - ALLOW_NETWORK=${ALLOW_NETWORK:-false}
+      - ALLOW_TERRAFORM_APPLY=${ALLOW_TERRAFORM_APPLY:-false}
+    volumes:
+      - ./data:/app/data
+      - ./examples:/app/examples:ro
+      - ./policies:/app/policies:ro
+    command: ["--task", "/app/examples/local-task.yaml", "--mode", "dry_run"]
+    restart: "no"
+
+  sdlc-test:
+    build: .
+    container_name: agentic-sdlc-test
+    environment:
+      - PYTHONPATH=/app
+      - DRY_RUN=true
+    command: ["-m", "pytest", "tests/", "-v", "--tb=short"]
+    restart: "no"
+    profiles:
+      - test

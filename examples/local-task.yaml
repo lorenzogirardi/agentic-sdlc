@@ -1,0 +1,17 @@
+execution_id: local-demo-001
+title: Add health endpoint
+description: Add a health endpoint to the service
+repository_path: ./examples/sample-service
+base_branch: main
+acceptance_criteria:
+  - endpoint returns HTTP 200
+  - unit tests are present
+  - no critical security findings
+requested_agents:
+  - repo_inspector
+  - test_pyramid
+  - security
+  - code_quality
+  - lint
+  - observability
+mode: dry_run

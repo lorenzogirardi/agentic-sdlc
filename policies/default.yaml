@@ -1,0 +1,45 @@
+# Default Policy Configuration — Agentic SDLC
+# B-001-006
+
+policies:
+  max_execution_minutes: 30
+  max_agent_steps: 50
+  max_retries_per_agent: 2
+  max_estimated_cost_eur: 1.00
+  allow_network: false
+  allow_terraform_apply: false
+  allow_production_deploy: false
+  max_parallel_agents: 4
+
+  require_human_approval_for:
+    - terraform_apply
+    - merge
+    - production_deploy
+    - secret_access
+
+  block_on_security_severity:
+    - critical
+    - high
+
+  allowed_commands:
+    - git
+    - pytest
+    - npm
+    - pnpm
+    - yarn
+    - go
+    - cargo
+    - terraform
+    - tflint
+    - checkov
+    - trivy
+    - gitleaks
+    - semgrep
+    - docker
+    - hadolint
+    - python
+    - pip
+    - ruff
+    - mypy
+    - coverage
+    - curl

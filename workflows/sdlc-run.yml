@@ -1,0 +1,112 @@
+name: Agentic SDLC Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_yaml:
+        description: "Task specification (YAML content) or path to task file"
+        required: false
+        default: ""
+      mode:
+        description: "Execution mode"
+        type: choice
+        options:
+          - dry_run
+          - pr
+          - approval_required
+        default: dry_run
+      policy_path:
+        description: "Policy file path"
+        required: false
+        default: "policies/default.yaml"
+  schedule:
+    # Trello polling fallback (webhook mode is preferred)
+    - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: sdlc-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  run-sdlc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENCODE_BASE_URL: ${{ secrets.OPENCODE_BASE_URL }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL || 'deepseek-v4-flash-free' }}
+      TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+      TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+      TRELLO_BOARD_ID: ${{ vars.TRELLO_BOARD_ID }}
+      TRELLO_LIST_ID: ${{ vars.TRELLO_LIST_ID }}
+      TRELLO_RUN_LABEL_ID: ${{ vars.TRELLO_RUN_LABEL_ID }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
+      DRY_RUN: ${{ inputs.mode == 'dry_run' && 'true' || 'false' }}
+      ALLOW_NETWORK: "false"
+      ALLOW_TERRAFORM_APPLY: "false"
+
+    steps:
+      - name: Checkout framework
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run framework tests
+        run: pytest tests/unit -v --tb=short
+
+      - name: Prepare task input
+        id: task
+        run: |
+          if [ -n "${{ inputs.task_yaml }}" ]; then
+            echo "${{ inputs.task_yaml }}" > /tmp/dispatch-task.yaml
+            echo "path=/tmp/dispatch-task.yaml" >> "$GITHUB_OUTPUT"
+          elif [ -f "examples/local-task.yaml" ]; then
+            echo "path=examples/local-task.yaml" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run orchestrator
+        if: steps.task.outputs.path != ''
+        run: |
+          python -m orchestrator.engine \
+            --task "${{ steps.task.outputs.path }}" \
+            --mode "${{ inputs.mode || 'dry_run' }}" \
+            --policy "${{ inputs.policy_path }}"
+
+      - name: Upload execution reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdlc-reports-${{ github.run_id }}
+          path: data/executions/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## Agentic SDLC Execution" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Mode: ${{ inputs.mode || 'dry_run' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run ID: ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -d data/executions ]; then
+            for report in data/executions/*/report.json; do
+              [ -f "$report" ] || continue
+              verdict=$(python -c "import json;print(json.load(open('$report'))['verdict'])" 2>/dev/null || echo "unknown")
+              echo "- Report \`$report\`: **$verdict**" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
