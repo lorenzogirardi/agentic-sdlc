@@ -1,41 +1,33 @@
-name: Agentic SDLC Run
+name: Agentic SDLC — Trello Poll
 
 on:
   workflow_dispatch:
     inputs:
-      task_yaml:
-        description: "Task specification (YAML content) or path to task file"
-        required: false
-        default: ""
+      poll_once:
+        description: "Single poll pass (no loop)"
+        type: boolean
+        default: true
       mode:
         description: "Execution mode"
         type: choice
-        options:
-          - dry_run
-          - pr
-          - approval_required
-        default: dry_run
-      policy_path:
-        description: "Policy file path"
-        required: false
-        default: "policies/default.yaml"
+        options: [dry_run, pr, approval_required]
+        default: pr
   schedule:
-    # Trello polling fallback (webhook mode is preferred)
     - cron: "*/15 * * * *"
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
 
 concurrency:
-  group: sdlc-${{ github.ref }}
+  group: sdlc-trello-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  run-sdlc:
+  poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     env:
       OPENCODE_BASE_URL: ${{ secrets.OPENCODE_BASE_URL }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
@@ -43,49 +35,39 @@ jobs:
       TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
       TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
       TRELLO_BOARD_ID: ${{ vars.TRELLO_BOARD_ID }}
-      TRELLO_LIST_ID: ${{ vars.TRELLO_LIST_ID }}
       TRELLO_RUN_LABEL_ID: ${{ vars.TRELLO_RUN_LABEL_ID }}
+      TRELLO_TODO_LIST_ID: ${{ vars.TRELLO_TODO_LIST_ID }}
+      TRELLO_IN_PROGRESS_LIST_ID: ${{ vars.TRELLO_IN_PROGRESS_LIST_ID }}
+      TRELLO_DONE_LIST_ID: ${{ vars.TRELLO_DONE_LIST_ID }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT }}
-      DRY_RUN: ${{ inputs.mode == 'dry_run' && 'true' || 'false' }}
-      ALLOW_NETWORK: "false"
-      ALLOW_TERRAFORM_APPLY: "false"
+      GITHUB_OWNER: ${{ github.repository_owner }}
+      GITHUB_REPOSITORY: ${{ github.event.repository.name }}
+      TARGET_REPO_PATH: ${{ github.workspace }}
 
     steps:
-      - name: Checkout framework
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
+          cache: pip
 
       - name: Install dependencies
-        run: pip install -e .
+        run: pip install -e ".[dev]" && pip install python-dotenv
 
       - name: Run framework tests
-        run: pytest tests/unit -v --tb=short
+        run: pytest tests/unit -q --tb=short
 
-      - name: Prepare task input
-        id: task
-        run: |
-          if [ -n "${{ inputs.task_yaml }}" ]; then
-            echo "${{ inputs.task_yaml }}" > /tmp/dispatch-task.yaml
-            echo "path=/tmp/dispatch-task.yaml" >> "$GITHUB_OUTPUT"
-          elif [ -f "examples/local-task.yaml" ]; then
-            echo "path=examples/local-task.yaml" >> "$GITHUB_OUTPUT"
-          else
-            echo "path=" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run orchestrator
-        if: steps.task.outputs.path != ''
+      - name: Poll Trello and execute
+        env:
+          POLL_ONCE: ${{ inputs.poll_once != 'false' && '--poll-interval 0' || '' }}
         run: |
           python -m orchestrator.engine \
-            --task "${{ steps.task.outputs.path }}" \
-            --mode "${{ inputs.mode || 'dry_run' }}" \
-            --policy "${{ inputs.policy_path }}"
+            --poll-trello \
+            --mode ${{ inputs.mode || 'pr' }} \
+            $POLL_ONCE
 
       - name: Upload execution reports
         if: always()
@@ -99,14 +81,13 @@ jobs:
       - name: Job summary
         if: always()
         run: |
-          echo "## Agentic SDLC Execution" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Mode: ${{ inputs.mode || 'dry_run' }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Run ID: ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Agentic SDLC — Trello Poll" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Run ID:** ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Mode:** ${{ inputs.mode || 'pr' }}" >> "$GITHUB_STEP_SUMMARY"
           if [ -d data/executions ]; then
             for report in data/executions/*/report.json; do
               [ -f "$report" ] || continue
-              verdict=$(python -c "import json;print(json.load(open('$report'))['verdict'])" 2>/dev/null || echo "unknown")
-              echo "- Report \`$report\`: **$verdict**" >> "$GITHUB_STEP_SUMMARY"
+              verdict=$(python -c "import json; print(json.load(open('$report')).get('verdict','?'))")
+              echo "- $(dirname $report | xargs basename): **$verdict**" >> "$GITHUB_STEP_SUMMARY"
             done
           fi
