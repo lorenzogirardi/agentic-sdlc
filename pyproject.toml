@@ -22,6 +22,7 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.28",
     "prometheus_client>=0.21",
     "aiofiles>=24.1",
+    "langgraph>=0.2",
 ]
 
 [project.optional-dependencies]

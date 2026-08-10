@@ -1,0 +1,87 @@
+{
+  "id": "6a79d7bfe1cadc85c494ae77",
+  "agent": null,
+  "badges": {
+    "attachments": 0,
+    "fogbugz": "",
+    "checkItems": 0,
+    "checkItemsChecked": 0,
+    "checkItemsEarliestDue": null,
+    "comments": 0,
+    "description": true,
+    "due": null,
+    "dueComplete": false,
+    "lastUpdatedByAi": false,
+    "start": null,
+    "externalSource": null,
+    "attachmentsByType": {
+      "trello": {
+        "board": 0,
+        "card": 0
+      }
+    },
+    "location": false,
+    "votes": 0,
+    "maliciousAttachments": 0,
+    "viewingMemberVoted": false,
+    "subscribed": false
+  },
+  "checkItemStates": [],
+  "closed": false,
+  "dueComplete": false,
+  "dateLastActivity": "2026-08-10T13:53:03.732Z",
+  "desc": "## Acceptance Criteria\n- GET /mandelbrot returns Mandelbrot set fractal data as JSON\n- parameters: iterations (1-500), width (100-800), height (75-600), xmin/xmax/ymin/ymax (float)\n- input is clamped and validated\n- all existing tests still pass (6/6 total)\n- ruff lint reports zero errors\n- type annotations on all new code\n\n## Agents\n- coding\n- security\n- code_quality",
+  "descData": {
+    "emoji": {}
+  },
+  "due": null,
+  "dueReminder": null,
+  "email": null,
+  "idBoard": "6a784e64550433b462147902",
+  "idChecklists": [],
+  "idList": "6a784e64550433b46214797d",
+  "idMembers": [],
+  "idMembersVoted": [],
+  "idShort": 8,
+  "idAttachmentCover": null,
+  "labels": [
+    {
+      "id": "6a786793c35c2460fd5a8474",
+      "idBoard": "6a784e64550433b462147902",
+      "idOrganization": "6a784e63550433b462147677",
+      "name": "agent:run",
+      "nodeId": "ari:cloud:trello::label/workspace/6a784e63550433b462147677/6a786793c35c2460fd5a8474",
+      "color": "green",
+      "uses": 1
+    }
+  ],
+  "idLabels": [
+    "6a786793c35c2460fd5a8474"
+  ],
+  "manifest": null,
+  "manualCoverAttachment": false,
+  "name": "[AGENTS] Add Mandelbrot set endpoint to fractal API",
+  "nodeId": "ari:cloud:trello::card/workspace/6a784e63550433b462147677/6a79d7bfe1cadc85c494ae77",
+  "pinned": false,
+  "pos": 140737488355328,
+  "shortLink": "cIInNMnh",
+  "shortUrl": "https://trello.com/c/cIInNMnh",
+  "start": null,
+  "subscribed": false,
+  "url": "https://trello.com/c/cIInNMnh/8-agents-add-mandelbrot-set-endpoint-to-fractal-api",
+  "cover": {
+    "idAttachment": null,
+    "color": null,
+    "idUploadedBackground": null,
+    "size": "normal",
+    "brightness": "dark",
+    "yPosition": 0.5,
+    "idPlugin": null
+  },
+  "isTemplate": false,
+  "cardRole": null,
+  "mirrorSourceId": null,
+  "attachments": [],
+  "stickers": [],
+  "limits": {}
+}

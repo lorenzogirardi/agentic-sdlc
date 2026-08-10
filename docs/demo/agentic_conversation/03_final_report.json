@@ -1,0 +1,62 @@
+{
+  "execution_id": "trello-cIInNMnh",
+  "task_title": "[AGENTS] Add Mandelbrot set endpoint to fractal API",
+  "final_state": "REVIEW_REQUIRED",
+  "verdict": "REQUIRES_HUMAN_APPROVAL",
+  "summary": "Verdict: REQUIRES_HUMAN_APPROVAL",
+  "total_duration_ms": 96064.822,
+  "total_agent_steps": 7,
+  "agent_results": [
+    {
+      "agent_name": "planner",
+      "status": "SUCCESS",
+      "error": null,
+      "duration_ms": 0.9805419977055863
+    },
+    {
+      "agent_name": "coding",
+      "status": "SUCCESS",
+      "error": null,
+      "duration_ms": 92088.46937499766
+    },
+    {
+      "agent_name": "test_pyramid",
+      "status": "SUCCESS",
+      "error": null,
+      "duration_ms": 3513.4556669945596
+    },
+    {
+      "agent_name": "lint",
+      "status": "SUCCESS",
+      "error": null,
+      "duration_ms": 32.501540990779176
+    },
+    {
+      "agent_name": "security",
+      "status": "SUCCESS",
+      "error": null,
+      "duration_ms": 16.891583989490755
+    },
+    {
+      "agent_name": "code_quality",
+      "status": "FAILED",
+      "error": null,
+      "duration_ms": 395.9145830012858
+    },
+    {
+      "agent_name": "reviewer",
+      "status": "SUCCESS",
+      "error": null,
+      "duration_ms": 0.2789579884847626
+    }
+  ],
+  "findings": [
+    "[security] Warning from gitleaks",
+    "[security] Warning from semgrep",
+    "[code_quality] Step failed: no error detail",
+    "[code_quality] Warning from mypy"
+  ],
+  "warnings": [],
+  "errors": [],
+  "created_at": "2026-08-10T13:54:41.118423+00:00"
+}

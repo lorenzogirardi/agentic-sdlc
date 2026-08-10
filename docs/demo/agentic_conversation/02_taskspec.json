@@ -1,0 +1,29 @@
+{
+  "execution_id": "trello-cIInNMnh",
+  "source": "trello",
+  "title": "[AGENTS] Add Mandelbrot set endpoint to fractal API",
+  "description": "## Acceptance Criteria\n- GET /mandelbrot returns Mandelbrot set fractal data as JSON\n- parameters: iterations (1-500), width (100-800), height (75-600), xmin/xmax/ymin/ymax (float)\n- input is clamped and validated\n- all existing tests still pass (6/6 total)\n- ruff lint reports zero errors\n- type annotations on all new code\n\n## Agents\n- coding\n- security\n- code_quality",
+  "repository_path": "./examples/sample-service",
+  "base_branch": "main",
+  "acceptance_criteria": [
+    "GET /mandelbrot returns Mandelbrot set fractal data as JSON",
+    "parameters: iterations (1-500), width (100-800), height (75-600), xmin/xmax/ymin/ymax (float)",
+    "input is clamped and validated",
+    "all existing tests still pass (6/6 total)",
+    "ruff lint reports zero errors",
+    "type annotations on all new code"
+  ],
+  "requested_agents": [
+    "coding",
+    "security",
+    "code_quality"
+  ],
+  "mode": "dry_run",
+  "metadata": {
+    "trello_card_id": "6a79d7bfe1cadc85c494ae77",
+    "trello_short_link": "cIInNMnh",
+    "trello_url": "https://trello.com/c/cIInNMnh/8-agents-add-mandelbrot-set-endpoint-to-fractal-api",
+    "trello_board_id": "6a784e64550433b462147902",
+    "trello_list_id": "6a784e64550433b46214797d"
+  }
+}
