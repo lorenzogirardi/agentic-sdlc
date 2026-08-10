@@ -193,7 +193,7 @@ C4Container
 | Component | Responsibility | Key Files |
 |-----------|---------------|-----------|
 | **CLI Engine** | Parse args, load env, dispatch to orchestrator or Trello polling | `orchestrator/engine.py` |
-| **Orchestrator** | State machine (10 states), DAG scheduling, parallel agent dispatch, metric recording | `orchestrator/engine.py`, `state_machine.py`, `dag_scheduler.py` |
+| **Orchestrator** | State machine (10 states), agent execution via LangGraph StateGraph (severity-blocking + human-approval interrupt), metric recording | `orchestrator/engine.py`, `state_machine.py`, `langgraph_engine.py` |
 | **Policy Engine** | YAML-driven rules: allowlist, max cost, max steps, severity blocking, human approval gates | `orchestrator/policy_engine.py`, `policies/default.yaml` |
 | **Tool Runner** | Subprocess sandbox: allowlist enforcement, timeout, stderr/stdout separation, secret redaction via regex, output truncation at 512KB | `runners/tool_runner.py` |
 | **Execution Store** | Persist state as JSON per execution_id, resume after crash, step history | `orchestrator/execution_context.py` |
@@ -205,6 +205,7 @@ C4Container
 | **Coding Agent** | LLM-generated diffs, path safety guard (blocks `.env`, `secret`, `credential`, path traversal), no merge | `agents/coding.py` |
 | **Code Quality** | `mypy` type checking, file size analysis, complexity heuristics | `agents/code_quality.py` |
 | **Docker Agent** | Static analysis: root user detection, version pinning, HEALTHCHECK, secret in ENV/ARG | `agents/docker.py` |
+| **DockerBuildAgent** | Builds (and, when a registry is configured, pushes) a Docker image via ToolRunner — push is never implicit or attempted in dry-run | `agents/docker_build.py` |
 | **Terraform Agent** | `fmt -check`, `validate`, sensitive resource detection (IAM, DB, networking), no-apply enforcement | `agents/terraform.py` |
 | **Cost Eval** | Heuristic AWS cost estimation, confidence levels, never invents prices | `agents/cost_eval.py` |
 | **Observability** | Health/readiness/metrics/tracing/logging detection, suggestion-only, never blocking | `agents/observability.py` |
@@ -307,7 +308,53 @@ Token con permessi minimi (`contents:write`, `pull_requests:write`,
 `issues:write` sul solo repo target). In `DRY_RUN=true` l'adapter non chiama
 l'API. Adattatore no-op: `DryRunGitHubAdapter`.
 
-## 12. Configurazione OpenCode
+## 12. LangGraph execution core + GitHub Actions artifact pipeline
+
+L'orchestrator esegue il DAG di agenti tramite un `StateGraph` di
+[LangGraph](https://github.com/langchain-ai/langgraph) (`orchestrator/langgraph_engine.py`),
+non più il DAG scheduler custom precedente:
+
+- **Severity blocking**: se un agente restituisce `findings` con severity in
+  `policy.block_on_security_severity`, il nodo LangGraph solleva
+  `PolicyBlockedError` e interrompe l'esecuzione — enforcement reale, non solo
+  configurazione dichiarata.
+- **Human-approval interrupt**: se `policy.require_human_approval_for`
+  include `"merge"`, il grafo si ferma con `interrupt_before=["reviewer"]`
+  prima del nodo reviewer.
+- **Checkpointing**: ogni esecuzione usa un `InMemorySaver` per thread
+  (`execution_id`), abilitando resume dello stato del grafo.
+
+Lo stesso grafo gira in due modalità alternative, selezionate da
+`EXECUTION_MODE` (env var letta dal webhook Trello):
+
+| `EXECUTION_MODE` | Comportamento |
+|---|---|
+| `local` (default) | Il webhook Trello esegue la pipeline in-process (uso locale / Docker Compose) |
+| `github_action` | Il webhook invia un evento `repository_dispatch` (`orchestrator/github_dispatch.py`) che innesca `.github/workflows/agentic-run.yml` |
+
+`.github/workflows/agentic-run.yml` (trigger: `repository_dispatch` o
+`workflow_dispatch` manuale) esegue la pipeline, apre una PR se gli agenti
+hanno prodotto modifiche, poi builda e pubblica l'immagine Docker della
+sample-service fractal app su GHCR:
+
+```
+ghcr.io/<owner>/<repo>-fractal:<sha>
+ghcr.io/<owner>/<repo>-fractal:latest
+```
+
+Trigger manuale senza Trello:
+
+```bash
+gh workflow run agentic-run.yml \
+  -f task_json='{"title":"test","repository_path":"examples/sample-service","mode":"pr"}'
+```
+
+Altri workflow in `.github/workflows/`: `sdlc-self-test.yml` (lint/typecheck/test/docker-build/security-scan
+su ogni push/PR), `sdlc-pr.yml` (review automatica sulle PR aperte sul repo),
+`sdlc-run.yml` (polling Trello schedulato ogni 15 minuti, modalità legacy
+`--poll-trello`).
+
+## 13. Configurazione OpenCode
 
 Endpoint OpenAI-compatible:
 
@@ -321,14 +368,14 @@ Il modello non è hardcodato; output validato con JSON Schema; output non
 conforme rifiutato; retry con backoff solo per errori trasienti (mai per
 errori di validazione).
 
-## 13. Gestione dei secret
+## 14. Gestione dei secret
 
 - Solo env vars / GitHub Secrets — mai in codice, mai nei log.
 - ToolRunner redaziona pattern di secret su stdout/stderr.
 - CodingAgent rifiuta path che contengono `.env`, `secret`, `credential`.
 - Firma webhook Trello verificata (HMAC-SHA1).
 
-## 14. Esempio end-to-end
+## 15. Esempio end-to-end
 
 ```bash
 # 1. avvia il sample service target
@@ -340,7 +387,7 @@ cat data/executions/local-demo-001/report.json
 Verdict atteso: `PASS`, `PASS_WITH_WARNINGS`, `BLOCKED` o
 `REQUIRES_HUMAN_APPROVAL`.
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 | Problema | Causa | Soluzione |
 |----------|-------|-----------|
@@ -349,27 +396,28 @@ Verdict atteso: `PASS`, `PASS_WITH_WARNINGS`, `BLOCKED` o
 | verdict `REQUIRES_HUMAN_APPROVAL` | uno o più agenti falliti | leggi `findings` nel report |
 | stato `BACKLOG` nel report | bug noto MVP: stato persistito da ultima scrittura | fixed via `update_state(..., ctx=ctx)` |
 
-## 16. Limiti noti
+## 17. Limiti noti
 
 - Nessun webhook Trello gestito in HA (singolo receiver).
 - Cost Evaluation usa euristica statica, non Infracost live.
 - Coverage test non aggregata cross-linguaggio.
 - Nessun merge automatico (by design).
 
-## 17. Roadmap
+## 18. Roadmap
 
-1. CodingAgent con apply su branch GitHub reale (PR mode).
+1. ~~CodingAgent con apply su branch GitHub reale (PR mode)~~ — fatto: `_open_pr_if_changed` in `orchestrator/engine.py` + pipeline GitHub Actions.
 2. Infracost integration per CostEvalAgent.
 3. ReviewerAgent LLM-assisted con acceptance-criteria matching semantico.
 4. Web UI per approval flow.
 5. Supporto multi-repo per execution.
+6. Human-approval interrupt (`interrupt_before`) attivo solo sul path webhook/local — il vecchio `--poll-trello` non pausa/riprende a metà esecuzione.
 
-## 18. Threat model sintetico
+## 19. Threat model sintetico
 
 Vedi [SECURITY.md](SECURITY.md): prompt injection, command injection, secret
 leakage, terraform apply accidentale, esecuzioni duplicate, esfiltrazione OTLP.
 
-## 19. Comandi Makefile
+## 20. Comandi Makefile
 
 | Comando | Scopo |
 |---------|-------|
