@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-08-10T13:38:44.344221+00:00",
+  "mode": "dry_run",
+  "llm_model": "deepseek-v4-flash-free",
+  "llm_endpoint": "https://opencode.ai/zen/v1",
+  "trello_board": "ztHVFxwB"
+}

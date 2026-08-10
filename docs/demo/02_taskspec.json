@@ -1,0 +1,31 @@
+{
+  "execution_id": "trello-UN5jh272",
+  "source": "trello",
+  "title": "[DEMO] Add Mandelbrot set endpoint to fractal API",
+  "description": "## Acceptance Criteria\n- GET /mandelbrot returns a valid Mandelbrot set fractal\n- endpoint accepts iterations, width, height, xmin, xmax, ymin, ymax parameters\n- input is validated (iterations clamped 1-100, dimensions 100-800)\n- all existing tests still pass (6/6 including new ones)\n- ruff lint reports zero errors\n- no critical security findings\n\n## Agents\n- repo_inspector\n- test_pyramid\n- security\n- lint\n- code_quality",
+  "repository_path": "./examples/sample-service",
+  "base_branch": "main",
+  "acceptance_criteria": [
+    "GET /mandelbrot returns a valid Mandelbrot set fractal",
+    "endpoint accepts iterations, width, height, xmin, xmax, ymin, ymax parameters",
+    "input is validated (iterations clamped 1-100, dimensions 100-800)",
+    "all existing tests still pass (6/6 including new ones)",
+    "ruff lint reports zero errors",
+    "no critical security findings"
+  ],
+  "requested_agents": [
+    "repo_inspector",
+    "test_pyramid",
+    "security",
+    "lint",
+    "code_quality"
+  ],
+  "mode": "dry_run",
+  "metadata": {
+    "trello_card_id": "6a79d4659a0bc3124daa77b7",
+    "trello_short_link": "UN5jh272",
+    "trello_url": "https://trello.com/c/UN5jh272/6-demo-add-mandelbrot-set-endpoint-to-fractal-api",
+    "trello_board_id": "6a784e64550433b462147902",
+    "trello_list_id": "6a784e64550433b46214797d"
+  }
+}
