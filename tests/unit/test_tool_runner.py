@@ -9,7 +9,7 @@ class TestToolRunner:
     def test_secret_pattern_matches_api_key(self) -> None:
         policy = PolicyConfig()
         pattern = policy.secret_patterns[0]
-        assert re.search(pattern, "api_key=sk-abc123secret456")
+        assert re.search(pattern, "api_key=sk-abc123secret456")  # gitleaks:allow
         assert re.search(pattern, "API_KEY: my-secret-value")
 
     def test_secret_pattern_matches_private_key_header(self) -> None:
@@ -20,7 +20,7 @@ class TestToolRunner:
     def test_secret_pattern_matches_github_token(self) -> None:
         policy = PolicyConfig()
         pattern = policy.secret_patterns[2]
-        assert re.search(pattern, "ghp_1234567890abcdef1234567890abcdef123456")
+        assert re.search(pattern, "ghp_1234567890abcdef1234567890abcdef123456")  # gitleaks:allow
 
     def test_command_in_allowlist(self) -> None:
         policy = PolicyConfig()

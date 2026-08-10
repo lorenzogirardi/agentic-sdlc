@@ -3,13 +3,25 @@
 The user ONLY creates a Trello card. Agents do everything else.
 """
 
-import asyncio, json, os, sys, time
+import asyncio
+import json
+import os
+import time
 from datetime import UTC, datetime
 from pathlib import Path
+
+import httpx
 from dotenv import load_dotenv
 
+from integrations.opencode_adapter import OpenCodeAdapter
+from integrations.trello_adapter import TrelloRESTAdapter
+from orchestrator.engine import Orchestrator
+from orchestrator.execution_context import ExecutionStore
+from orchestrator.policy_engine import PolicyEngine
+from runners.tool_runner import ToolRunner
+from schemas.execution import ExecutionMode
+
 load_dotenv(".env")
-import httpx
 
 K = os.getenv("TRELLO_API_KEY")
 T = os.getenv("TRELLO_TOKEN")
@@ -23,14 +35,6 @@ IN_PROGRESS = "6a784e64550433b46214797e"
 DONE = "6a784e64550433b46214797f"
 TODO = "6a784e64550433b46214797d"
 
-from integrations.trello_adapter import TrelloRESTAdapter
-from integrations.opencode_adapter import OpenCodeAdapter
-from orchestrator.engine import Orchestrator
-from orchestrator.execution_context import ExecutionStore
-from orchestrator.policy_engine import PolicyEngine
-from runners.tool_runner import ToolRunner
-from schemas.execution import ExecutionMode
-
 OUT_DIR = Path("docs/demo/agentic_conversation")
 
 
@@ -42,7 +46,6 @@ async def cleanup_board(c: httpx.AsyncClient) -> None:
 
 
 async def main() -> None:
-    ts = time.strftime("%H:%M:%S")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     def save(name: str, data: object) -> None:
@@ -88,7 +91,7 @@ async def main() -> None:
     card_url = card.get("url", "?")
     print(f"\n📋 User creates Trello card: [{card['shortLink']}]")
     print(f"   {card_url}")
-    print(f"   Agents requested: coding, security, code_quality")
+    print("   Agents requested: coding, security, code_quality")
 
     # ── Move to In Progress ──
     trello = TrelloRESTAdapter(api_key=K, token=T, dry_run=False)
@@ -123,12 +126,17 @@ async def main() -> None:
         print(f"  {s:6s} {a['agent_name']:20s} {a['duration_ms']:8.0f}ms")
 
     if report.get("findings"):
-        print(f"\n  Findings:")
+        print("\n  Findings:")
         for f in report["findings"][:5]:
             print(f"    - {f[:130]}")
 
     # ── Update Trello ──
-    prefix = {"PASS": "PASS", "PASS_WITH_WARNINGS": "PASS*", "BLOCKED": "BLOCKED", "REQUIRES_HUMAN_APPROVAL": "REVIEW"}
+    prefix = {
+        "PASS": "PASS",
+        "PASS_WITH_WARNINGS": "PASS*",
+        "BLOCKED": "BLOCKED",
+        "REQUIRES_HUMAN_APPROVAL": "REVIEW",
+    }
     new_name = f"[{prefix.get(verdict, verdict)}] {card['name'].replace('[AGENTS] ', '')}"
     await trello.update_card_fields(card["id"], name=new_name)
 
@@ -137,7 +145,7 @@ async def main() -> None:
         f"**Verdict:** {verdict}",
         f"**Duration:** {elapsed:.1f}s",
         f"**Execution ID:** `{report['execution_id']}`",
-        f"**LLM:** deepseek-v4-flash-free\n",
+        "**LLM:** deepseek-v4-flash-free\n",
         "### Conversation\n",
     ]
     for a in report["agent_results"]:
@@ -147,7 +155,7 @@ async def main() -> None:
         comment.append("\n### Findings\n")
         for f in report["findings"][:8]:
             comment.append(f"- {f}")
-    comment.append(f"\n---\n_Agents converged after conversation loop — no human wrote code_")
+    comment.append("\n---\n_Agents converged after conversation loop — no human wrote code_")
 
     await trello.add_comment(card["id"], "\n".join(comment))
 
@@ -164,7 +172,7 @@ async def main() -> None:
     save("06_result_test_app.py.txt", test_content)
 
     print(f"\n{'='*70}")
-    print(f"  DONE — agents wrote code, verified, reported")
+    print("  DONE — agents wrote code, verified, reported")
     print(f"  Trello: {card_url}")
     print(f"  Artifacts: {OUT_DIR}/")
     print(f"{'='*70}")

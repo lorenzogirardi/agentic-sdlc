@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
@@ -143,7 +143,7 @@ def _extract_json_changes(raw: str) -> list[dict[str, Any]]:
     if json_match:
         try:
             data = json.loads(json_match.group())
-            return data.get("changes", [])
+            return cast(list[dict[str, Any]], data.get("changes", []))
         except (json.JSONDecodeError, TypeError):
             pass
     code_blocks = re.findall(r"```(?:json)?\s*([\s\S]*?)```", raw)
@@ -151,7 +151,7 @@ def _extract_json_changes(raw: str) -> list[dict[str, Any]]:
         try:
             data = json.loads(block.strip())
             if "changes" in data:
-                return data["changes"]
+                return cast(list[dict[str, Any]], data["changes"])
         except (json.JSONDecodeError, TypeError):
             continue
     return []
