@@ -1,5 +1,6 @@
 """B-001-010 — Trello Adapter tests."""
 
+import base64
 import hashlib
 import hmac
 
@@ -99,8 +100,18 @@ class TestWebhookSignature:
         secret = "my-secret"
         callback = "https://example.com/webhook"
         payload = b'{"action": {}}'
-        sig = hmac.new(secret.encode(), payload + callback.encode(), hashlib.sha1).hexdigest()
+        sig = base64.b64encode(
+            hmac.new(secret.encode(), payload + callback.encode(), hashlib.sha1).digest()
+        ).decode()
         assert verify_trello_webhook_signature(payload, sig, secret, callback)
+
+    def test_hex_signature_is_rejected(self) -> None:
+        """Regression: Trello signs with base64, not hex — hex must never validate."""
+        secret = "my-secret"
+        callback = "https://example.com/webhook"
+        payload = b'{"action": {}}'
+        hex_sig = hmac.new(secret.encode(), payload + callback.encode(), hashlib.sha1).hexdigest()
+        assert not verify_trello_webhook_signature(payload, hex_sig, secret, callback)
 
     def test_invalid_signature(self) -> None:
         assert not verify_trello_webhook_signature(

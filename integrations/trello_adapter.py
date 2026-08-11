@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import os
@@ -264,8 +265,13 @@ class DryRunTrelloAdapter(TrelloAdapter):
 def verify_trello_webhook_signature(
     payload: bytes, signature: str, secret: str, callback_url: str
 ) -> bool:
-    """Verify Trello webhook signature (HMAC-SHA1 of payload + callbackURL)."""
-    digest = hmac.new(secret.encode(), payload + callback_url.encode(), hashlib.sha1).hexdigest()
+    """Verify Trello webhook signature (base64 HMAC-SHA1 of payload + callbackURL).
+
+    Trello sends the X-Trello-Webhook header as base64, not hex — using
+    hexdigest() here would never match a real delivery.
+    """
+    raw_digest = hmac.new(secret.encode(), payload + callback_url.encode(), hashlib.sha1).digest()
+    digest = base64.b64encode(raw_digest).decode()
     return hmac.compare_digest(digest, signature)
 
 

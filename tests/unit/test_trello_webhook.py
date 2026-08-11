@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -156,7 +157,9 @@ class TestSignatureVerificationUnaffected:
         )
         client = TestClient(app)
         body = json.dumps(_payload()).encode()
-        digest = hmac.new(secret.encode(), body + callback.encode(), hashlib.sha1).hexdigest()
+        digest = base64.b64encode(
+            hmac.new(secret.encode(), body + callback.encode(), hashlib.sha1).digest()
+        ).decode()
 
         resp = client.post("/webhook/trello", content=body, headers={"x-trello-webhook": digest})
 
