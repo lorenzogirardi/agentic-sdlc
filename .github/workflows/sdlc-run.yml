@@ -12,11 +12,8 @@ on:
         type: choice
         options: [dry_run, pr, approval_required]
         default: pr
-  # schedule trigger disabled until TRELLO_* secrets are configured on this
-  # repo (Settings → Secrets and variables → Actions) — was firing every 15
-  # min and failing on trello_missing_config. Re-enable once secrets are set:
-  # schedule:
-  #   - cron: "*/15 * * * *"
+  schedule:
+    - cron: "*/15 * * * *"
 
 permissions:
   contents: write
