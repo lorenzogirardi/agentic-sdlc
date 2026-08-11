@@ -118,9 +118,9 @@ async def main() -> None:
         save("04_execution_state.json", store.load(task.execution_id).model_dump())
 
     verdict = report["verdict"]
-    print(f"\n{'─'*50}")
+    print(f"\n{'─' * 50}")
     print(f"  Verdict: {verdict}  |  {elapsed:.1f}s  |  {len(report['agent_results'])} agents")
-    print(f"{'─'*50}")
+    print(f"{'─' * 50}")
     for a in report["agent_results"]:
         s = "PASS" if a["status"] == "SUCCESS" else "FAIL"
         print(f"  {s:6s} {a['agent_name']:20s} {a['duration_ms']:8.0f}ms")
@@ -171,11 +171,11 @@ async def main() -> None:
     save("05_result_app.py.txt", app_content)
     save("06_result_test_app.py.txt", test_content)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("  DONE — agents wrote code, verified, reported")
     print(f"  Trello: {card_url}")
     print(f"  Artifacts: {OUT_DIR}/")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     await trello.close()
 
