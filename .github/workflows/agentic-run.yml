@@ -21,9 +21,6 @@ permissions:
 jobs:
   run-agents:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: agentic-sdlc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,8 +89,8 @@ jobs:
       - name: Build and push fractal sample-service image
         uses: docker/build-push-action@v6
         with:
-          context: agentic-sdlc/examples/sample-service
-          file: agentic-sdlc/examples/sample-service/Dockerfile
+          context: examples/sample-service
+          file: examples/sample-service/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ github.repository }}-fractal:${{ github.sha }}
