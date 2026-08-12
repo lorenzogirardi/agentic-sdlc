@@ -61,6 +61,7 @@ jobs:
         run: python -m orchestrator.engine --task ci-task.yaml --mode pr
 
       - name: Open PR for agent changes
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -72,12 +73,14 @@ jobs:
             git add -A
             git commit -m "agentic: automated changes (run ${{ github.run_id }})"
             git push origin "$BRANCH"
-            gh pr create \
+            PR_URL=$(gh pr create \
               --title "Agentic SDLC run ${{ github.run_id }}" \
               --body "Automated changes from the agentic pipeline (execution report in workflow logs)." \
-              --head "$BRANCH"
+              --head "$BRANCH")
+            echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
           else
             echo "No changes produced by agents — skipping PR."
+            echo "url=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Log in to GHCR
@@ -96,3 +99,75 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}-fractal:${{ github.sha }}
             ghcr.io/${{ github.repository }}-fractal:latest
+
+      - name: Update Trello card with result
+        if: always()
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          IMAGE_TAG: ghcr.io/${{ github.repository }}-fractal:${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import glob
+          import json
+          import os
+
+          import httpx
+          import yaml
+
+          key = os.environ["TRELLO_API_KEY"]
+          token = os.environ["TRELLO_TOKEN"]
+          pr_url = os.environ.get("PR_URL", "")
+          run_url = os.environ["RUN_URL"]
+          image_tag = os.environ["IMAGE_TAG"]
+
+          with open("ci-task.yaml") as f:
+              task = yaml.safe_load(f)
+          card_id = task.get("metadata", {}).get("trello_card_id")
+          if not card_id:
+              print("no trello_card_id in task spec — skipping card update")
+              raise SystemExit(0)
+
+          reports = glob.glob("data/executions/*/report.json")
+          verdict = "UNKNOWN"
+          summary = ""
+          if reports:
+              with open(reports[0]) as f:
+                  report = json.load(f)
+              verdict = report.get("verdict", "UNKNOWN")
+              summary = report.get("summary", "")
+
+          prefix = {
+              "PASS": "PASS",
+              "PASS_WITH_WARNINGS": "PASS*",
+              "BLOCKED": "BLOCKED",
+              "REQUIRES_HUMAN_APPROVAL": "REVIEW",
+          }.get(verdict, verdict)
+
+          lines = [f"## Agentic SDLC Run — {verdict}", "", f"**Run:** {run_url}"]
+          if pr_url:
+              lines.append(f"**PR:** {pr_url}")
+          lines.append(f"**Image:** `{image_tag}`")
+          if summary:
+              lines += ["", summary]
+          comment = "\n".join(lines)
+
+          base = "https://api.trello.com/1"
+          params = {"key": key, "token": token}
+
+          httpx.post(
+              f"{base}/cards/{card_id}/actions/comments",
+              params=params,
+              data={"text": comment},
+              timeout=30,
+          )
+          httpx.put(
+              f"{base}/cards/{card_id}",
+              params=params,
+              data={"name": f"[{prefix}] " + task.get("title", "")},
+              timeout=30,
+          )
+          print(f"Trello card {card_id} updated: {verdict}")
+          PY
