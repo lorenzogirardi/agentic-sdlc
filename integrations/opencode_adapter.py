@@ -18,6 +18,12 @@ DEFAULT_BASE_URL = "https://opencode.ai/zen/v1"
 DEFAULT_TIMEOUT = 120
 MAX_RETRIES = 2
 RETRY_BASE_DELAY = 1.0
+# deepseek-v4-flash-free is a reasoning model (models.dev: reasoning=true,
+# interleaved reasoning_content) — reasoning tokens count against max_tokens
+# same as the final content. Too low a budget lets it burn everything on
+# reasoning and return an empty content field. Model's real output cap is
+# 128k; 16k leaves ample room for reasoning + a full-file coding response.
+DEFAULT_MAX_TOKENS = 16384
 
 
 class OpenCodeError(Exception):
@@ -60,7 +66,7 @@ class OpenCodeAdapter:
         self,
         messages: list[dict[str, str]],
         response_schema: type[BaseModel] | None = None,
-        max_tokens: int = 4096,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
         temperature: float = 0.2,
     ) -> dict:
         # Native `response_format: json_schema` isn't reliably supported by every
