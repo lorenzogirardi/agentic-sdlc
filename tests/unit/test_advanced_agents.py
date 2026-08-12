@@ -1,5 +1,6 @@
 """B-001-013/016/018/019/020/021 — Advanced agent tests."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -48,6 +49,30 @@ class TestCodingAgent:
         assert agent._is_safe_path("config/secret.yaml") is False
         assert agent._is_safe_path("src/main.py") is True
         assert agent._is_safe_path("keys/id_rsa") is False
+
+    async def test_existing_code_passed_to_llm(self, tmp_path: Path) -> None:
+        """Regression: CodingAgent used to prompt the LLM blind, with no view of
+        the current code — it once rewrote a FastAPI app to Flask from scratch
+        because it never saw the existing framework."""
+        (tmp_path / "app.py").write_text("from fastapi import FastAPI\napp = FastAPI()\n")
+
+        class RecordingOpenCode:
+            def __init__(self) -> None:
+                self.last_messages: list[dict] | None = None
+
+            async def chat(self, messages, response_schema=None, **kwargs):
+                self.last_messages = messages
+                return {"changes": []}
+
+        opencode = RecordingOpenCode()
+        agent = CodingAgent(opencode_adapter=opencode)
+        ctx = make_ctx(tmp_path)
+
+        await agent.execute(ctx)
+
+        assert opencode.last_messages is not None
+        user_content = json.loads(opencode.last_messages[1]["content"])
+        assert "from fastapi import FastAPI" in user_content["existing_files"]
 
     def test_path_escape_blocked(self, tmp_path: Path) -> None:
         agent = CodingAgent()

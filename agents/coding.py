@@ -26,6 +26,8 @@ class CodingResult(BaseModel):
 class CodingAgent(Agent):
     name = "coding"
     FORBIDDEN_PATH_PARTS = (".env", "secret", "credential", ".git/", "id_rsa", ".pem")
+    READABLE_SUFFIXES = (".py", ".yaml", ".yml", ".toml", ".txt", ".md", ".json")
+    MAX_CONTEXT_BYTES = 20_000
 
     def __init__(self, opencode_adapter: Any = None) -> None:
         self._opencode = opencode_adapter
@@ -51,14 +53,21 @@ class CodingAgent(Agent):
                 "dry_run": True,
             }
 
+        existing_files = self._read_repo_context(task.repository_path)
+
         try:
             result = await self._opencode.chat(
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "You are a senior software engineer. Given a task, "
-                            "produce the minimal file changes. "
+                            "You are a senior software engineer. Given a task and the "
+                            "CURRENT content of the relevant repository files, produce "
+                            "the minimal file changes to satisfy the task. "
+                            "Extend the existing code shown below — match its framework, "
+                            "style, and response shapes. Do not rewrite working code to a "
+                            "different framework or library unless the task explicitly "
+                            "asks for it. "
                             "Return valid JSON with 'changes' array. "
                             "Each change has: path, content (FULL file), rationale. "
                             "Never modify .env, secrets, credentials."
@@ -72,6 +81,7 @@ class CodingAgent(Agent):
                                 "title": task.title,
                                 "description": task.description,
                                 "acceptance_criteria": task.acceptance_criteria,
+                                "existing_files": existing_files,
                             }
                         ),
                     },
@@ -124,6 +134,33 @@ class CodingAgent(Agent):
 
     def _is_safe_path(self, path: str) -> bool:
         return not any(part in path.lower() for part in self.FORBIDDEN_PATH_PARTS)
+
+    def _read_repo_context(self, repository_path: str) -> str:
+        """Snapshot of existing source files, so the LLM extends real code
+        instead of inventing a fresh implementation (and picking a different
+        framework) from scratch."""
+        root = Path(repository_path)
+        if not root.is_dir():
+            return ""
+
+        parts: list[str] = []
+        total = 0
+        for path in sorted(root.rglob("*")):
+            if not path.is_file() or path.suffix not in self.READABLE_SUFFIXES:
+                continue
+            rel = str(path.relative_to(root))
+            if not self._is_safe_path(rel):
+                continue
+            try:
+                content = path.read_text()
+            except (UnicodeDecodeError, OSError):
+                continue
+            if total + len(content) > self.MAX_CONTEXT_BYTES:
+                continue
+            parts.append(f"--- {rel} ---\n{content}")
+            total += len(content)
+
+        return "\n\n".join(parts)
 
     def _apply_changes(self, repo_path: str, changes: list[dict[str, Any]]) -> None:
         root = Path(repo_path).resolve()
