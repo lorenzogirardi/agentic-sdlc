@@ -40,3 +40,30 @@ def test_fractal_clamps_extreme_values() -> None:
     data = response.json()
     assert data["width"] <= 800
     assert data["height"] <= 600
+
+
+def test_burning_ship_returns_valid_structure() -> None:
+    response = client.get("/burning-ship")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["type"] == "burning_ship"
+    assert "points" in data
+    assert len(data["points"]) == data["height"]
+    assert len(data["points"][0]) == data["width"]
+
+
+def test_burning_ship_respects_dimensions() -> None:
+    response = client.get("/burning-ship?width=200&height=150")
+    data = response.json()
+    assert data["width"] == 200
+    assert data["height"] == 150
+    assert len(data["points"]) == 150
+    assert len(data["points"][0]) == 200
+
+
+def test_burning_ship_clamps_extreme_values() -> None:
+    response = client.get("/burning-ship?width=2000&height=2000&iterations=500")
+    data = response.json()
+    assert data["width"] <= 800
+    assert data["height"] <= 600
+    assert data["parameters"]["max_iterations"] <= 200

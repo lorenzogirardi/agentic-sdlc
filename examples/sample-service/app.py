@@ -41,6 +41,38 @@ async def fractal(
     )
 
 
+@app.get("/burning-ship")
+async def burning_ship(
+    iterations: int = 5,
+    width: int = 400,
+    height: int = 300,
+    xmin: float = -2.0,
+    xmax: float = 1.0,
+    ymin: float = -1.5,
+    ymax: float = 1.5,
+) -> JSONResponse:
+    max_iter = max(1, min(iterations, 200))
+    w = max(100, min(width, 800))
+    h = max(75, min(height, 600))
+
+    points = _burning_ship_set(w, h, xmin, xmax, ymin, ymax, max_iter)
+    return JSONResponse(
+        content={
+            "type": "burning_ship",
+            "parameters": {
+                "xmin": xmin,
+                "xmax": xmax,
+                "ymin": ymin,
+                "ymax": ymax,
+                "max_iterations": max_iter,
+            },
+            "width": w,
+            "height": h,
+            "points": points,
+        }
+    )
+
+
 def _julia_set(w: int, h: int, cx: float, cy: float, zoom: float, max_iter: int) -> list[list[int]]:
     aspect = w / h
     scale_x = 3.0 / zoom
@@ -57,6 +89,32 @@ def _julia_set(w: int, h: int, cx: float, cy: float, zoom: float, max_iter: int)
                 xtemp = zx * zx - zy * zy + cx
                 zy = 2.0 * zx * zy + cy
                 zx = xtemp
+                iteration += 1
+            row.append(iteration)
+        result.append(row)
+    return result
+
+
+def _burning_ship_set(
+    w: int,
+    h: int,
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+    max_iter: int,
+) -> list[list[int]]:
+    result: list[list[int]] = []
+    for py in range(h):
+        row: list[int] = []
+        for px in range(w):
+            zx = xmin + (xmax - xmin) * px / (w - 1) if w > 1 else xmin
+            zy = ymin + (ymax - ymin) * py / (h - 1) if h > 1 else ymin
+            iteration = 0
+            while zx * zx + zy * zy < 4.0 and iteration < max_iter:
+                xtemp = zx * zx - zy * zy + xmin
+                zy = abs(2.0 * zx * zy) + ymin
+                zx = abs(xtemp)
                 iteration += 1
             row.append(iteration)
         result.append(row)
