@@ -28,6 +28,10 @@ class OutputValidationError(OpenCodeError):
     pass
 
 
+class _EmptyCompletionError(Exception):
+    """Internal marker: retryable, unlike OutputValidationError."""
+
+
 class OpenCodeAdapter:
     def __init__(
         self,
@@ -88,6 +92,11 @@ class OpenCodeAdapter:
                 duration_ms = (time.perf_counter() - start) * 1000
 
                 content = response.choices[0].message.content or ""
+                if not content.strip():
+                    # Empty completions from the free-tier model are usually a
+                    # transient provider hiccup, not a deterministic bad request —
+                    # worth retrying, unlike a genuinely malformed/non-JSON reply.
+                    raise _EmptyCompletionError("model returned an empty completion")
 
                 parsed: dict = {}
                 if response_schema is not None:

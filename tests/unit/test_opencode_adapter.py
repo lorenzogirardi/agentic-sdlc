@@ -98,6 +98,32 @@ class TestOpenCodeAdapterMock:
 
         assert result["summary"] == "ok"
 
+    async def test_empty_completion_is_retried(self) -> None:
+        """Empty completions are a common free-tier provider hiccup — retryable,
+        unlike a genuinely malformed non-JSON reply."""
+        adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
+        payload = json.dumps({"summary": "ok", "required_agents": []})
+        mock_create = AsyncMock(side_effect=[make_mock_response(""), make_mock_response(payload)])
+        adapter._client = MagicMock()
+        adapter._client.chat.completions.create = mock_create
+
+        result = await adapter.chat(
+            [{"role": "user", "content": "plan"}], response_schema=PlannerSchema
+        )
+
+        assert result["summary"] == "ok"
+        assert mock_create.call_count == 2
+
+    async def test_empty_completion_exhausted_retries_raise(self) -> None:
+        adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
+        mock_create = AsyncMock(return_value=make_mock_response(""))
+        adapter._client = MagicMock()
+        adapter._client.chat.completions.create = mock_create
+
+        with pytest.raises(OpenCodeError, match="failed after"):
+            await adapter.chat([{"role": "user", "content": "plan"}])
+        assert mock_create.call_count == 3  # MAX_RETRIES + 1
+
     async def test_schema_mismatch_rejected(self) -> None:
         adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
         payload = json.dumps({"wrong_field": 123})
