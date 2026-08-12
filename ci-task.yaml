@@ -1,0 +1,55 @@
+acceptance_criteria: []
+base_branch: main
+description: 'description:
+
+  Acceptance Criteria
+
+
+  - GET /tricorn returns Tricorn fractal data as JSON, same response shape as /fractal
+
+  - accepts query params: iterations, width, height, xmin, xmax, ymin, ymax
+
+  - iterations clamped 1-100, width clamped 100-800, height clamped 75-600
+
+  - all existing tests still pass
+
+  - ruff lint reports zero errors
+
+  - no critical or high security findings
+
+
+  ## Agents
+
+
+  - repo_inspector
+
+  - coding
+
+  - test_pyramid
+
+  - security
+
+  - lint
+
+  - code_quality
+
+  - docker'
+execution_id: trello-vuqSHmw4
+metadata:
+  trello_board_id: 6a784e64550433b462147902
+  trello_card_id: 6a7cd107cefc256f8c0cee67
+  trello_list_id: 6a7b616b353151562a87d6a7
+  trello_short_link: vuqSHmw4
+  trello_url: https://trello.com/c/vuqSHmw4/12-add-tricorn-fractal-endpoint
+mode: pr
+repository_path: examples/sample-service
+requested_agents:
+- repo_inspector
+- coding
+- test_pyramid
+- security
+- lint
+- code_quality
+- docker
+source: trello
+title: add tricorn fractal endpoint
