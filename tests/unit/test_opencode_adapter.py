@@ -122,7 +122,7 @@ class TestOpenCodeAdapterMock:
 
         with pytest.raises(OpenCodeError, match="failed after"):
             await adapter.chat([{"role": "user", "content": "plan"}])
-        assert mock_create.call_count == 3  # MAX_RETRIES + 1
+        assert mock_create.call_count == 5  # MAX_RETRIES + 1
 
     async def test_schema_mismatch_rejected(self) -> None:
         adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
@@ -156,7 +156,7 @@ class TestOpenCodeAdapterMock:
 
         with pytest.raises(OpenCodeError, match="failed after"):
             await adapter.chat([{"role": "user", "content": "hi"}])
-        assert mock_create.call_count == 3  # MAX_RETRIES + 1
+        assert mock_create.call_count == 5  # MAX_RETRIES + 1
 
     def test_env_fallbacks(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("OPENCODE_BASE_URL", "http://env-url")

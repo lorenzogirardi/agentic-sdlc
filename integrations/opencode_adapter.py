@@ -16,14 +16,16 @@ logger = get_logger(__name__)
 DEFAULT_MODEL = "deepseek-v4-flash-free"
 DEFAULT_BASE_URL = "https://opencode.ai/zen/v1"
 DEFAULT_TIMEOUT = 120
-MAX_RETRIES = 2
-RETRY_BASE_DELAY = 1.0
+MAX_RETRIES = 4
+RETRY_BASE_DELAY = 0.3
 # deepseek-v4-flash-free is a reasoning model (models.dev: reasoning=true,
 # interleaved reasoning_content) — reasoning tokens count against max_tokens
 # same as the final content. Too low a budget lets it burn everything on
 # reasoning and return an empty content field. Model's real output cap is
-# 128k; 16k leaves ample room for reasoning + a full-file coding response.
-DEFAULT_MAX_TOKENS = 16384
+# 128k; 24k leaves extra room over the 16k baseline for harder coding tasks
+# that need more reasoning before answering (raised after live flakiness on
+# a live demo run).
+DEFAULT_MAX_TOKENS = 24576
 
 
 class OpenCodeError(Exception):
