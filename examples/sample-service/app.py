@@ -41,6 +41,38 @@ async def fractal(
     )
 
 
+@app.get("/newton")
+async def newton(
+    iterations: int = 5,
+    width: int = 400,
+    height: int = 300,
+    xmin: float = -1.0,
+    xmax: float = 1.0,
+    ymin: float = -1.0,
+    ymax: float = 1.0,
+) -> JSONResponse:
+    max_iter = max(1, min(iterations, 100))
+    w = max(100, min(width, 800))
+    h = max(75, min(height, 600))
+
+    points = _newton_set(w, h, xmin, xmax, ymin, ymax, max_iter)
+    return JSONResponse(
+        content={
+            "type": "newton",
+            "parameters": {
+                "xmin": xmin,
+                "xmax": xmax,
+                "ymin": ymin,
+                "ymax": ymax,
+                "max_iterations": max_iter,
+            },
+            "width": w,
+            "height": h,
+            "points": points,
+        }
+    )
+
+
 def _julia_set(w: int, h: int, cx: float, cy: float, zoom: float, max_iter: int) -> list[list[int]]:
     aspect = w / h
     scale_x = 3.0 / zoom
@@ -57,6 +89,48 @@ def _julia_set(w: int, h: int, cx: float, cy: float, zoom: float, max_iter: int)
                 xtemp = zx * zx - zy * zy + cx
                 zy = 2.0 * zx * zy + cy
                 zx = xtemp
+                iteration += 1
+            row.append(iteration)
+        result.append(row)
+    return result
+
+
+def _newton_set(
+    w: int,
+    h: int,
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+    max_iter: int,
+) -> list[list[int]]:
+    result: list[list[int]] = []
+    for py in range(h):
+        row: list[int] = []
+        for px in range(w):
+            zx = xmin + (xmax - xmin) * px / (w - 1) if w > 1 else xmin
+            zy = ymin + (ymax - ymin) * py / (h - 1) if h > 1 else ymin
+            iteration = 0
+            while iteration < max_iter:
+                # Newton's method for z^3 - 1 = 0
+                zx2 = zx * zx
+                zy2 = zy * zy
+                zx3 = zx2 * zx - 3.0 * zx * zy2
+                zy3 = 3.0 * zx2 * zy - zy * zy2
+                # derivative: 3*z^2
+                dzx = 3.0 * (zx2 - zy2)
+                dzy = 6.0 * zx * zy
+                denom = dzx * dzx + dzy * dzy
+                if denom < 1e-12:
+                    break
+                # f(z) = z^3 - 1, so subtract f(z)/f'(z)
+                nx = zx - (zx3 - 1.0) * dzx / denom - zy3 * dzy / denom
+                ny = zy - zy3 * dzx / denom + (zx3 - 1.0) * dzy / denom
+                # check convergence
+                if (nx - zx) * (nx - zx) + (ny - zy) * (ny - zy) < 1e-12:
+                    break
+                zx = nx
+                zy = ny
                 iteration += 1
             row.append(iteration)
         result.append(row)
