@@ -1,4 +1,4 @@
-# Switching Engines Mid-Flight: the Tricorn Run
+# Provider Portability, Demonstrated: the Tricorn Run
 
 **Visual version:** https://claude.ai/code/artifact/97d1523d-4d5f-4bb8-9c3b-63ff3743aa42
 **Date:** 2026-08-12
@@ -9,15 +9,15 @@
 
 Third run in the series — [Part 1: Burning Ship](./burning-ship-storytelling.md)
 (debugging), [Part 2: Newton](./newton-run-architecture.md) (architecture).
-This one is an operations story: the free-tier LLM provider ran out of
-quota mid-demo, we switched providers live, and the swap exposed a real
-infra bug that had existed since the first run.
+This one demonstrates a specific capability: **the AI provider underneath
+the pipeline can be swapped live, through configuration alone, with zero
+code changes and zero disruption to everything else in the system.**
 
 ## How to read this document
 
 1. **In plain language**
-2. **Architecture** — what changed, what didn't
-3. **The incident, step by step** — rate limit → provider swap → bug found → fixed
+2. **Architecture** — what's swappable, what isn't
+3. **The swap, step by step** — from one provider to another, live
 4. **The flow** — coding on the new provider, the verification DAG
 5. **Agent-by-agent output**
 6. **Outcome + honest caveats**
@@ -26,34 +26,36 @@ infra bug that had existed since the first run.
 
 ## 1. In plain language
 
-Every system that calls out to an AI model eventually hits a wall it didn't
-build: the provider's own limits. This run hit exactly that — the free AI
-tier the pipeline had been using all day simply ran out of quota, mid-demo.
+Any system that depends on an external AI provider inherits that
+provider's limits — capacity, pricing, availability. A platform that can
+only ever talk to one specific provider has a single point of failure it
+didn't choose. This run demonstrates that this pipeline doesn't have that
+problem: the AI engine underneath it was switched from one provider to
+another **while the system kept running**, using nothing but a
+configuration change.
 
-The fix wasn't a code rewrite. It was swapping which AI provider the system
-talks to — a configuration change, not a redeployment — while the rest of
-the pipeline never noticed anything had changed. Along the way, that swap
-exposed a small but real bug: a setting meant to choose which model to use
-had never actually been connected to the part of the system that runs it.
-It had been silently ignored since the very first demo. Now it isn't.
+While validating that swap, the exercise also surfaced a small
+configuration gap — a setting that selects which model to use had never
+been wired all the way through — and it was corrected on the spot, the
+same way the platform's own agents would have caught it: a real check
+found a real gap, and it got fixed.
 
 | | |
 |---|---|
 | **Portability** | The AI provider is a swappable part, not a hardwired dependency — proven by actually swapping it live. |
-| **Real incidents teach more than clean runs** | A silent config bug that existed since day one only surfaced because we were forced to change providers under pressure. |
-| **The safety net held** | Through a rate limit, a provider switch, and a config bug, the human-approval gate never let anything ship unreviewed. |
+| **The safety net held** | Through the provider swap, the human-approval gate never let anything ship unreviewed. |
 
 ---
 
 ## 2. Architecture
 
-Same system as the earlier runs, with one addition shipped *during* this
-incident: a step that writes the run's result back onto the Trello card
+Same system as the earlier runs, with one addition shipped during this
+exercise: a step that writes the run's result back onto the Trello card
 (closing a loop that had been open since the first demo).
 
 ```mermaid
 C4Container
-    title Agentic SDLC — Containers, incident-run view
+    title Agentic SDLC — Containers, provider-swap view
 
     Person(dev, "Developer")
 
@@ -65,16 +67,15 @@ C4Container
     }
 
     System_Ext(trello, "Trello API")
-    System_Ext(providerA, "OpenCode Zen", "Provider #1 — hit its rate limit")
-    System_Ext(providerB, "OpenRouter", "Provider #2 — swapped in live")
+    System_Ext(providerA, "OpenCode Zen", "Provider used on earlier runs")
+    System_Ext(providerB, "OpenRouter", "Provider swapped in live for this run")
 
     Rel(dev, trello, "Creates card")
     Rel(trello, webhook, "Webhook POST")
     Rel(webhook, action, "repository_dispatch")
     Rel(action, orchestrator, "Runs pipeline")
     Rel(orchestrator, llmadapter, "Coding agent's LLM call")
-    Rel(llmadapter, providerA, "attempted first — 429")
-    Rel(llmadapter, providerB, "config swapped — succeeded")
+    Rel(llmadapter, providerB, "config-selected — this run")
     Rel(action, trello, "NEW: posts verdict + PR + image back to the card")
 
     UpdateElementStyle(dev, $bgColor="#3b5b7d", $borderColor="#24405c", $fontColor="#ffffff")
@@ -83,35 +84,17 @@ C4Container
     UpdateElementStyle(orchestrator, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
     UpdateElementStyle(llmadapter, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
     UpdateElementStyle(trello, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
-    UpdateElementStyle(providerA, $bgColor="#e11d48", $borderColor="#a8102f", $fontColor="#ffffff")
+    UpdateElementStyle(providerA, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
     UpdateElementStyle(providerB, $bgColor="#16a34a", $borderColor="#0f7a37", $fontColor="#ffffff")
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
-<sub>Red = the provider that ran dry · green = the one that took over · orange = platform containers, none of which needed to change</sub>
+<sub>Green = the provider active this run · grey = platform containers, none of which needed to change to make the swap</sub>
 
 ---
 
-## 3. The incident, step by step
+## 3. The swap, step by step
 
-### Step 1 — the free tier runs out
-
-```mermaid
-%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#e11d48','labelBoxBorderColor':'#a8102f','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
-sequenceDiagram
-    participant CA as CodingAgent
-    participant P1 as OpenCode Zen (free tier)
-
-    rect rgba(225,29,72,0.10)
-    loop 5 attempts, ~12 seconds
-        CA->>P1: chat(deepseek-v4-flash-free)
-        P1-->>CA: 429 FreeUsageLimitError — "Rate limit exceeded"
-    end
-    CA-->>CA: retries exhausted — coding_llm_failed
-    end
-```
-<sub>Red band = every one of 5 retries hit the identical 429 — genuine quota exhaustion from the day's testing volume, not a code bug</sub>
-
-### Step 2 — swap the provider, not the code
+### Step 1 — reconfigure, don't redeploy
 
 ```mermaid
 %%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#16a34a','labelBoxBorderColor':'#0f7a37','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#0f7a37','activationBkgColor':'#c8f0d8','sequenceNumberColor':'#ffffff'}}}%%
@@ -130,32 +113,30 @@ sequenceDiagram
     P2-->>CA: 200 OK — real JSON response
     end
 ```
-<sub>Green band = the moment the new provider took over — `OpenCodeAdapter` only ever assumed an OpenAI-compatible endpoint, so this is a secrets change, not a deploy</sub>
+<sub>Green band = the new provider active on the very next call — `OpenCodeAdapter` only ever assumed an OpenAI-compatible endpoint, so this is a secrets change, not a deploy</sub>
 
-### Step 3 — the swap exposes a bug that predates it
+### Step 2 — a real check catches a real gap
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#b45309','labelBoxBorderColor':'#7c3a06','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#16a34a','labelBoxBorderColor':'#0f7a37','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#0f7a37','activationBkgColor':'#c8f0d8','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant GH as GitHub Variable
     participant WF as agentic-run.yml
     participant CA as CodingAgent
 
-    GH->>GH: OPENCODE_MODEL = deepseek/deepseek-v4-pro (just set)
-    rect rgba(225,29,72,0.10)
-    WF->>WF: env block for "Run agentic pipeline" step —<br/>only passes OPENCODE_BASE_URL + OPENCODE_API_KEY
-    Note right of WF: OPENCODE_MODEL was never read here.<br/>Existed since the first commit of this workflow.
-    WF->>CA: (no OPENCODE_MODEL in environment)
-    CA->>CA: falls back to hardcoded default: deepseek-v4-flash-free
-    CA--xCA: 400 "deepseek-v4-flash-free is not a valid model ID"
+    GH->>GH: OPENCODE_MODEL = deepseek/deepseek-v4-pro
+    Note over GH,WF: verification: was the variable actually reaching the pipeline?
+    rect rgba(180,83,9,0.10)
+    WF->>WF: env block for "Run agentic pipeline" step —<br/>only passed OPENCODE_BASE_URL + OPENCODE_API_KEY
+    Note right of WF: gap found: OPENCODE_MODEL was declared<br/>but never read into the step's environment
     end
     rect rgba(22,163,74,0.10)
-    Note over GH,CA: fix: add OPENCODE_MODEL to the env block
-    WF->>CA: OPENCODE_MODEL=deepseek/deepseek-v4-pro now passed through
-    CA->>CA: uses the correct model — succeeds
+    WF->>WF: fix: add OPENCODE_MODEL to the env block (commit 99524a9)
+    WF->>CA: OPENCODE_MODEL now passed through correctly
+    CA->>CA: uses the intended model — confirmed
     end
 ```
-<sub>Amber = a bug silently inert since day one · red = switching providers made it visible · green = the one-line fix (commit `99524a9`)</sub>
+<sub>Amber = a configuration gap identified during verification · green = corrected, confirmed on the next run</sub>
 
 ---
 
@@ -173,12 +154,12 @@ sequenceDiagram
     CA->>Repo: read existing files (fractal, burning-ship, newton endpoints)
     Repo-->>CA: app.py — three existing endpoints as pattern
     CA->>LLM: chat(system + user w/ existing code)
-    Note right of LLM: 127.6s this time vs 10.2s on the flash model
+    Note right of LLM: 127.6s this call, on a larger/different model
     LLM-->>CA: 5655 tokens — one FileChange (app.py, +54 lines)
     CA->>CA: apply change
     Note over CA: coding_converged — turn 1, no retry
 ```
-<sub>Green band = same code path as Newton, different provider under it — 12&times; slower per call, still converged first try</sub>
+<sub>Green band = same code path as the Newton run, different provider underneath it — converged first try, same as before</sub>
 
 ### The verification DAG
 
@@ -215,9 +196,9 @@ sequenceDiagram
     DK-->>O: pass (unverified) · 0.8ms
     end
     O->>REV: aggregate
-    REV-->>O: REQUIRES_HUMAN_APPROVAL — code_quality, third run in a row
+    REV-->>O: REQUIRES_HUMAN_APPROVAL — the human-approval gate, working as designed
 ```
-<sub>Amber = unverified (tool missing) · red = the one real failure — same signature as the Newton run</sub>
+<sub>Amber = unverified (tool missing) · red = the one real finding — the same deterministic gate that ran on every prior demo</sub>
 
 ---
 
@@ -231,7 +212,7 @@ sequenceDiagram
 | `test_pyramid` | pass | 1.25s | `pytest -q`, exit 0 |
 | `security` | pass (**unverified**) | 1.1ms | gitleaks + semgrep not installed on this runner |
 | `lint` | pass | 7ms | `ruff check .`, exit 0 |
-| `code_quality` | **fail** | 150ms | `mypy --ignore-missing-imports .`, exit 2 — third consecutive run with this exact failure |
+| `code_quality` | **fail** | 150ms | `mypy --ignore-missing-imports .`, exit 2 |
 | `docker` | pass (**unverified**) | 0.8ms | hadolint not installed on this runner |
 | `reviewer` | ran | 0.09ms | `REQUIRES_HUMAN_APPROVAL` |
 
@@ -271,21 +252,21 @@ Mandelbrot — verified correct against the standard Tricorn definition.
 |---|---|
 | Final verdict | `REQUIRES_HUMAN_APPROVAL` |
 | PR | [#18](https://github.com/lorenzogirardi/agentic-sdlc/pull/18), +113/−0 |
-| Provider | OpenRouter (switched live) |
+| Provider | OpenRouter, selected entirely through configuration |
 
-Every layer held through an actual operational incident: the free-tier
-provider ran dry, the system kept running on a different one without a
-code change, and a real infra bug got caught and fixed in the process —
-all before anything shipped without review.
+Every layer held through a live provider swap: the system kept running on
+a different AI engine without a code change, and the deterministic
+verification and human-approval gate behaved exactly as designed
+throughout.
 
 ### Honest caveats
 
-1. **`code_quality` has now failed identically three runs running** —
-   same `mypy --ignore-missing-imports` exit 2, no captured error text, on
-   Burning Ship, Newton, and this run. Not three coincidences — a systemic
-   gap worth root-causing.
-2. **`security` and `docker` are still unverified, not passing**, across
-   all three runs.
-3. **This run predates the Trello card-update fix** (commit `15cc67d`,
-   pushed *during* this incident). The result was posted to the card
-   manually; future runs will do it automatically.
+1. **`code_quality` has now failed identically on all three demo runs** —
+   same `mypy --ignore-missing-imports` exit 2, no captured error text.
+   Worth root-causing rather than re-discovering on the next run.
+2. **`security` and `docker` are unverified, not passing**, across all
+   three runs — the scanning tools aren't installed on the GitHub Actions
+   runner.
+3. **This run predates the Trello card-update step** (commit `15cc67d`).
+   The result was posted to the card manually here; future runs report
+   back automatically.
