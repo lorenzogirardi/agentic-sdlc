@@ -556,9 +556,15 @@ async def run_trello_polling(args: argparse.Namespace) -> int:
                     "REQUIRES_HUMAN_APPROVAL": "REVIEW",
                 }
 
+                # fetch_cards matches on label_id regardless of list — leaving it on
+                # would make every future poll re-run this same card forever.
+                remaining_labels = [
+                    label for label in card.get("idLabels", []) if label != label_id
+                ]
                 await trello.update_card_fields(
                     card_id,
                     name=f"[{prefix.get(verdict, verdict)}] {card_name}",
+                    idLabels=remaining_labels,
                 )
 
                 dur = report.get("total_duration_ms", 0)
