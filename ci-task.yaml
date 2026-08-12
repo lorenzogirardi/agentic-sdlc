@@ -1,0 +1,16 @@
+acceptance_criteria: []
+base_branch: main
+description: ''
+execution_id: trello-nYkVhmFI
+metadata:
+  trello_board_id: 6a784e64550433b462147902
+  trello_card_id: 6a7b66d5a76aca120d4d8ea3
+  trello_list_id: 6a784e64550433b46214797e
+  trello_short_link: nYkVhmFI
+  trello_url: https://trello.com/c/nYkVhmFI/9-blocked-blocked-blocked-blocked-blocked-blocked-blocked-blocked-blocked-add-burning-ship-fractal-endpoint
+mode: pr
+repository_path: examples/sample-service
+requested_agents: []
+source: trello
+title: '[BLOCKED] [BLOCKED] [BLOCKED] [BLOCKED] [BLOCKED] [BLOCKED] [BLOCKED] [BLOCKED]
+  [BLOCKED] Add Burning Ship fractal endpoint'
