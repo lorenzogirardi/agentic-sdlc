@@ -87,8 +87,17 @@ C4Context
     Rel(sdlc, llm, "Asks for code, given the task and existing files")
     Rel(sdlc, ghcr, "Publishes the built image")
     Rel(reviewer, github, "Reviews and merges the PR")
+
+    UpdateElementStyle(dev, $bgColor="#3b5b7d", $borderColor="#24405c", $fontColor="#ffffff")
+    UpdateElementStyle(reviewer, $bgColor="#3b5b7d", $borderColor="#24405c", $fontColor="#ffffff")
+    UpdateElementStyle(sdlc, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(trello, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(github, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(llm, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(ghcr, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
+<sub>Blue = human actors · orange = the platform · grey = third-party systems</sub>
 
 ### Container
 
@@ -121,8 +130,20 @@ C4Container
     Rel(agents, llm, "Coding agent only: generate the change")
     Rel(action, gh_api, "Opens the pull request")
     Rel(action, ghcr, "Builds + pushes the image")
+
+    UpdateElementStyle(dev, $bgColor="#3b5b7d", $borderColor="#24405c", $fontColor="#ffffff")
+    UpdateElementStyle(webhook, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(dispatch, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(action, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(orchestrator, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(agents, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(trello, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(gh_api, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(llm, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(ghcr, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
+<sub>Blue = the developer · orange shades = platform containers · grey = third-party</sub>
 
 ### Component — inside the Orchestrator
 
@@ -147,8 +168,17 @@ C4Component
     Rel(quality, toolrunner, "Shells out to the real tool")
     Rel(langgraph, policy, "Checks severity + approval rules per node")
     Rel(langgraph, reviewer, "Last node — produces the verdict")
+
+    UpdateElementStyle(planner, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(langgraph, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(policy, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(toolrunner, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(reviewer, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(coding, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(quality, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
+<sub>Orange = the graph/policy core · grey = the agents it drives</sub>
 
 ---
 
@@ -157,6 +187,7 @@ C4Component
 ### Step 1 — card to dispatch
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#16a34a','labelBoxBorderColor':'#0f7a37','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#0f7a37','activationBkgColor':'#c8f0d8','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     actor Dev as Developer
     participant Trello
@@ -166,12 +197,15 @@ sequenceDiagram
 
     Dev->>Trello: Create card "Add Newton fractal endpoint"<br/>label: agent:run
     Trello->>Webhook: POST /webhook/trello<br/>X-Trello-Webhook: base64 HMAC-SHA1
+    rect rgba(22,163,74,0.10)
     Webhook->>Webhook: verify signature against API Secret
     Webhook->>Webhook: card_to_task() — parse Acceptance Criteria + Agents
+    end
     Webhook->>GH: POST /repos/.../dispatches<br/>event_type=trello-card
     GH-->>Actions: repository_dispatch triggers agentic-run.yml
     Actions->>Actions: checkout, setup Python, pip install (~20s)
 ```
+<sub>Green band = the fix from the Burning Ship run holding up on a clean delivery</sub>
 
 ### Step 2 — how the agents get chosen
 
@@ -181,6 +215,7 @@ resolves them against a known alias table and builds the dependency graph
 **deterministically** — no model call, no ambiguity, no cost.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#ff6b35','labelBoxBorderColor':'#c9451f','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant Task as TaskSpec
     participant Planner as PlannerAgent
@@ -190,13 +225,14 @@ sequenceDiagram
     Task->>Planner: requested_agents = [repo_inspector, coding,<br/>test_pyramid, security, lint, code_quality, docker]
     Planner->>Alias: resolve each name
     Alias-->>Planner: all 7 already canonical — unresolved list is empty
-    rect rgba(255,107,53,0.08)
+    rect rgba(100,116,139,0.12)
     Note over Planner,LLM: skipped entirely this run —<br/>only reached when a name is ambiguous
     Planner--xLLM: (not called)
     end
     Planner->>Planner: _fallback_plan() — build linear DAG deterministically
     Planner-->>Task: dag ready in 0.32ms
 ```
+<sub>Grey band = the path not taken this run</sub>
 
 A vaguer card ("make it more secure") would route through the LLM instead;
 this one didn't need to.
@@ -204,6 +240,7 @@ this one didn't need to.
 ### Step 3 — the coding step, in detail
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#16a34a','labelBoxBorderColor':'#0f7a37','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#0f7a37','activationBkgColor':'#c8f0d8','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant CA as CodingAgent
     participant Repo as _read_repo_context()
@@ -216,10 +253,13 @@ sequenceDiagram
     Note right of LLM: reasoning model · max_tokens=16384
     LLM-->>CA: 5830 tokens · 10.2s — one FileChange (app.py, +74 lines)
     CA->>CA: apply change to working tree
+    rect rgba(22,163,74,0.10)
     CA->>Pre: pytest -q, ruff check .
     Pre-->>CA: both exit 0
     Note over CA: coding_converged — turn 1, no retry
+    end
 ```
+<sub>Green band = convergence on the first attempt</sub>
 
 Same mechanism that failed three times on the Burning Ship run (Aug 11) —
 this time it converged on the first attempt because the agent could see the
@@ -228,6 +268,7 @@ code it was extending.
 ### Step 4 — the verification DAG
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#ff6b35','labelBoxBorderColor':'#c9451f','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant O as Orchestrator
     participant RI as repo_inspector
@@ -242,19 +283,26 @@ sequenceDiagram
     RI-->>O: pass · 1.4ms
     O->>TP: execute() — pytest -q
     TP-->>O: pass · exit 0 · 2026ms
+    rect rgba(180,83,9,0.10)
     O->>SEC: execute() — gitleaks + semgrep
     Note right of SEC: both binaries absent on the runner —<br/>no scan ran, reported as pass
     SEC-->>O: pass (unverified) · 1.4ms
+    end
     O->>LI: execute() — ruff check
     LI-->>O: pass · exit 0 · 7ms
+    rect rgba(225,29,72,0.10)
     O->>CQ: execute() — mypy --ignore-missing-imports
     CQ-->>O: FAIL · exit 2 · 168ms
+    end
+    rect rgba(180,83,9,0.10)
     O->>DK: execute() — hadolint
     Note right of DK: binary absent on the runner —<br/>no check ran, reported as pass
     DK-->>O: pass (unverified) · 1.3ms
+    end
     O->>REV: aggregate all results
     REV-->>O: REQUIRES_HUMAN_APPROVAL — code_quality is the sole failure
 ```
+<sub>Amber = unverified (tool missing) · red = the one real failure</sub>
 
 **Execution order:** `repo_inspector → test_pyramid → security → lint →
 code_quality → docker → reviewer`. (`coding` runs first, outside this DAG,
@@ -264,17 +312,21 @@ as a fast pre-check right after coding, before the formal DAG shown above.)
 ### Step 5 — PR and image
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#16a34a','labelBoxBorderColor':'#0f7a37','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#0f7a37','activationBkgColor':'#c8f0d8','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant Actions as GitHub Actions
     participant GH as GitHub API
     participant GHCR
 
+    rect rgba(22,163,74,0.10)
     Actions->>GH: push branch agentic/31576762331
     Actions->>GH: open PR #14 ("Agentic SDLC run 31576762331")
     Actions->>GHCR: docker login
-    Actions->>GHCR: docker buildx build --push<br/>tags: latest, <commit-sha>
+    Actions->>GHCR: docker buildx build --push<br/>tags: latest, commit-sha
     GHCR-->>Actions: pushed, digest sha256:3b82c7f6...
+    end
 ```
+<sub>Green band = the deliverable, published</sub>
 
 ---
 

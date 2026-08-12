@@ -65,8 +65,17 @@ C4Context
     Rel(sdlc, llm, "Asks for code")
     Rel(sdlc, ghcr, "Publishes the image")
     Rel(reviewer, github, "Reviews and merges")
+
+    UpdateElementStyle(dev, $bgColor="#3b5b7d", $borderColor="#24405c", $fontColor="#ffffff")
+    UpdateElementStyle(reviewer, $bgColor="#3b5b7d", $borderColor="#24405c", $fontColor="#ffffff")
+    UpdateElementStyle(sdlc, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(trello, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(github, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(llm, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(ghcr, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
+<sub>Blue = human actors · orange = the platform · grey = third-party systems</sub>
 
 ### Container — the pieces this run exercised
 
@@ -99,8 +108,20 @@ C4Container
     Rel(agents, llm, "Coding agent: generate the change")
     Rel(action, gh_api, "Opens the pull request")
     Rel(action, ghcr, "Builds + pushes the image")
+
+    UpdateElementStyle(dev, $bgColor="#3b5b7d", $borderColor="#24405c", $fontColor="#ffffff")
+    UpdateElementStyle(webhook, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(dispatch, $bgColor="#ff6b35", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(action, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(orchestrator, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(agents, $bgColor="#ff8a5c", $borderColor="#c9451f", $fontColor="#ffffff")
+    UpdateElementStyle(trello, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(gh_api, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(llm, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
+    UpdateElementStyle(ghcr, $bgColor="#64748b", $borderColor="#45536b", $fontColor="#ffffff")
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
+<sub>Blue = the developer · orange shades = platform containers (darker where the entry point/dispatch lives) · grey = third-party</sub>
 
 Every bug in this story lives on one of these arrows. Keep this picture in
 mind — each numbered step below points back to the hop that broke.
@@ -110,6 +131,7 @@ mind — each numbered step below points back to the hop that broke.
 ## 3. The journey — six failed attempts, one diagram
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#e11d48','primaryBorderColor':'#a8102f','primaryTextColor':'#ffffff','lineColor':'#64748b','tertiaryColor':'#fde68a'}}}%%
 stateDiagram-v2
     [*] --> WorkflowBroken: trigger card
 
@@ -130,7 +152,13 @@ stateDiagram-v2
     LLMEmptyReply: Step 5b — empty completions
     WrongFramework: Step 6 — FastAPI rewritten to Flask
     CleanRun: Clean run
+
+    classDef failState fill:#e11d48,color:#ffffff,stroke:#a8102f,stroke-width:1px
+    classDef okState fill:#16a34a,color:#ffffff,stroke:#0f7a37,stroke-width:1px
+    class WorkflowBroken,WebhookRejected,DockerBlocked,InfiniteLoop,LLMRejected400,LLMEmptyReply,WrongFramework failState
+    class CleanRun okState
 ```
+<sub>Red = broken · green = the one state that shipped</sub>
 
 Every arrow above is a real commit, found by running the system against
 live infrastructure instead of mocks. None of these were visible from
@@ -154,15 +182,19 @@ a failed run.
 ### Step 2 — the signature check that could never have verified anything
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#ff6b35','labelBoxBorderColor':'#c9451f','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant Trello
     participant Webhook
 
     Trello->>Webhook: POST /webhook/trello<br/>X-Trello-Webhook: base64(HMAC-SHA1(secret, body+callbackURL))
+    rect rgba(225,29,72,0.10)
     Webhook->>Webhook: computed = hexdigest(HMAC-SHA1(secret, body+callbackURL))
     Note right of Webhook: base64 string ≠ hex string, always
     Webhook-->>Trello: 401 Unauthorized
+    end
 ```
+<sub>Red band = where it fails · amber = notes</sub>
 
 Trello signs webhook payloads with HMAC-SHA1, **base64-encoded**. The
 verification code compared against a **hex** digest instead. Every real
@@ -181,6 +213,7 @@ explicitly rejected — so this exact bug can't come back silently.
 ### Step 3 — the container that silently ran as root
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#ff6b35','labelBoxBorderColor':'#c9451f','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant Orch as Orchestrator
     participant Docker as DockerAgent
@@ -188,12 +221,15 @@ sequenceDiagram
 
     Orch->>Docker: execute() — static Dockerfile checks
     Docker->>Docker: no USER directive found
+    rect rgba(225,29,72,0.10)
     Docker-->>Orch: finding SDLC-DOCKER-001, severity=high
     Orch->>Policy: should_block_on_severity("high")?
     Policy-->>Orch: true (policy default: block on high/critical)
     Orch--xOrch: raise PolicyBlockedError
     Note over Orch: pipeline halts — no PR, no image
+    end
 ```
+<sub>Red band = the safety mechanism doing its job, not a bug</sub>
 
 Once the webhook worked, the pipeline actually ran — and one of its own
 agents caught something real: `examples/sample-service/Dockerfile` had no
@@ -213,18 +249,22 @@ exactly as built. **Fixed in `f1bb0e3`** by adding a non-root `USER app`.
 ### Step 4 — the card that reprocessed itself nine times
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#b45309','labelBoxBorderColor':'#7c3a06','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant Cron as sdlc-run.yml (cron, every ~15min)
     participant Trello
     participant Card as Demo card
 
-    loop every scheduled poll
+    rect rgba(180,83,9,0.08)
+    loop every scheduled poll — 9 times, unattended
         Cron->>Trello: fetch_cards(board_id, label_id=agent:run)
         Trello-->>Cron: [Card] — label still attached, board-wide match
         Cron->>Card: process again, prepend [BLOCKED] to name
         Note right of Card: label never removed —<br/>card matches again next poll
     end
+    end
 ```
+<sub>Amber = silent, unattended waste — not a crash, a slow leak</sub>
 
 While debugging the above, the demo card's title had accumulated **nine**
 `[BLOCKED]` prefixes. The scheduled Trello-polling workflow matches cards by
@@ -238,22 +278,24 @@ burned real OpenCode and GitHub Actions usage.
 ### Step 5 — the LLM that returned nothing, for two different reasons
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#ff6b35','labelBoxBorderColor':'#c9451f','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant CA as CodingAgent
     participant LLM as OpenCode Zen
 
-    rect rgba(225,29,72,0.08)
+    rect rgba(225,29,72,0.10)
     Note over CA,LLM: 5a — before fix 14fdf3b
     CA->>LLM: chat(response_format=json_schema)
     LLM-->>CA: 400 "response_format type is unavailable now"
     end
-    rect rgba(180,83,9,0.08)
+    rect rgba(180,83,9,0.10)
     Note over CA,LLM: 5b — after 5a fixed, before cd0c047
     CA->>LLM: chat(prompt-based JSON, max_tokens=4096)
     Note right of LLM: reasoning model — thinking tokens<br/>count against the same budget
     LLM-->>CA: content="" (budget spent on reasoning)
     end
 ```
+<sub>Red = rejected request · amber = silently starved of output budget</sub>
 
 - **Rejected request.** `response_format: json_schema` — the "give me
   strict, schema-validated JSON" API mode — was rejected outright by the
@@ -273,12 +315,13 @@ sequenceDiagram
 ### Step 6 — the agent that rewrote a working app in the wrong framework
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#ff6b35','labelBoxBorderColor':'#c9451f','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#c9451f','activationBkgColor':'#ffd9c2','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant CA as CodingAgent
     participant LLM as OpenCode Zen
     participant Tests as pytest
 
-    rect rgba(225,29,72,0.08)
+    rect rgba(225,29,72,0.10)
     Note over CA,Tests: before fix b31eb46 — CodingAgent never sends existing code
     CA->>LLM: chat(task description only)
     LLM-->>CA: FileChange — full app.py, rewritten in Flask
@@ -286,7 +329,7 @@ sequenceDiagram
     Tests-->>CA: FAIL (existing tests expect FastAPI)
     Note over CA: retry turn 2, 3 — same rewrite, same failure
     end
-    rect rgba(22,163,74,0.08)
+    rect rgba(22,163,74,0.10)
     Note over CA,Tests: after fix — reads existing code first
     CA->>CA: _read_repo_context() — read app.py
     CA->>LLM: chat(task + existing_files, "extend, don't replace")
@@ -295,6 +338,7 @@ sequenceDiagram
     Tests-->>CA: PASS
     end
 ```
+<sub>Red = blind rewrite, breaks tests · green = same agent, now shown the real code</sub>
 
 With the LLM finally responding, the pipeline produced its first real code —
 and CodingAgent used it to rewrite the sample service from **FastAPI to
@@ -329,6 +373,7 @@ coding_converged turn=1
 ```
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'primaryColor':'#ff6b35','primaryBorderColor':'#c9451f','primaryTextColor':'#ffffff','actorBkg':'#3b5b7d','actorBorder':'#24405c','actorTextColor':'#ffffff','actorLineColor':'#94a3b8','signalColor':'#334155','signalTextColor':'#1e293b','labelBoxBkgColor':'#16a34a','labelBoxBorderColor':'#0f7a37','labelTextColor':'#ffffff','loopTextColor':'#334155','noteBkgColor':'#fde68a','noteBorderColor':'#b45309','noteTextColor':'#78350f','activationBorderColor':'#0f7a37','activationBkgColor':'#c8f0d8','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     actor Dev as Developer
     participant Trello
@@ -343,12 +388,15 @@ sequenceDiagram
     Webhook->>GH: repository_dispatch (event_type=trello-card)
     GH-->>Actions: triggers agentic-run.yml
     Actions->>Orch: python -m orchestrator.engine --task ci-task.yaml --mode pr
+    rect rgba(22,163,74,0.10)
     Orch->>Orch: repo_inspector → coding → test_pyramid → security →<br/>lint → code_quality → docker → reviewer
     Orch-->>Actions: verdict=REQUIRES_HUMAN_APPROVAL
+    end
     Actions->>GH: push branch, open PR #12
     Actions->>GHCR: docker buildx build --push
     Actions-->>Dev: PR ready for review
 ```
+<sub>Green band = the run that finally went clean</sub>
 
 CodingAgent added `GET /burning-ship`, matching the existing `/fractal`
 endpoint's pattern exactly — same clamping logic, same response shape, a new
