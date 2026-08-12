@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 
 from openai import AsyncOpenAI
@@ -58,21 +59,26 @@ class OpenCodeAdapter:
         max_tokens: int = 4096,
         temperature: float = 0.2,
     ) -> dict:
+        # Native `response_format: json_schema` isn't reliably supported by every
+        # OpenCode-routed model (some reject it outright with a 400). Ask for JSON
+        # via the prompt instead, and parse leniently — works everywhere.
+        if response_schema is not None:
+            schema_instruction = {
+                "role": "system",
+                "content": (
+                    "Respond with ONLY valid JSON matching this schema, no prose, "
+                    "no markdown code fences:\n"
+                    f"{json.dumps(response_schema.model_json_schema())}"
+                ),
+            }
+            messages = [schema_instruction, *messages]
+
         model_kwargs: dict = {
             "model": self.model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
-
-        if response_schema is not None:
-            model_kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": response_schema.__name__,
-                    "schema": response_schema.model_json_schema(),
-                },
-            }
 
         last_error: Exception | None = None
         for attempt in range(MAX_RETRIES + 1):
@@ -136,8 +142,12 @@ class OpenCodeAdapter:
     def _validate_output(self, content: str, schema: type[BaseModel]) -> dict:
         try:
             data = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise OutputValidationError(f"Invalid JSON from model: {exc}") from exc
+        except json.JSONDecodeError:
+            stripped = _strip_markdown_fence(content)
+            try:
+                data = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise OutputValidationError(f"Invalid JSON from model: {exc}") from exc
 
         try:
             validated = schema.model_validate(data)
@@ -146,3 +156,11 @@ class OpenCodeAdapter:
             raise OutputValidationError(
                 f"Output does not match schema {schema.__name__}: {exc}"
             ) from exc
+
+
+_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)```")
+
+
+def _strip_markdown_fence(content: str) -> str:
+    match = _FENCE_RE.search(content)
+    return match.group(1).strip() if match else content

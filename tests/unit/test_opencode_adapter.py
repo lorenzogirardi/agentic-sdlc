@@ -59,6 +59,45 @@ class TestOpenCodeAdapterMock:
                 response_schema=PlannerSchema,
             )
 
+    async def test_no_response_format_sent(self) -> None:
+        """Some OpenCode-routed models reject response_format: json_schema outright."""
+        adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
+        payload = json.dumps({"summary": "Plan", "required_agents": ["lint"]})
+        mock_create = AsyncMock(return_value=make_mock_response(payload))
+        adapter._client = MagicMock()
+        adapter._client.chat.completions.create = mock_create
+
+        await adapter.chat([{"role": "user", "content": "plan"}], response_schema=PlannerSchema)
+
+        assert "response_format" not in mock_create.call_args.kwargs
+
+    async def test_schema_instruction_injected_as_system_message(self) -> None:
+        adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
+        payload = json.dumps({"summary": "Plan", "required_agents": []})
+        mock_create = AsyncMock(return_value=make_mock_response(payload))
+        adapter._client = MagicMock()
+        adapter._client.chat.completions.create = mock_create
+
+        await adapter.chat([{"role": "user", "content": "plan"}], response_schema=PlannerSchema)
+
+        sent_messages = mock_create.call_args.kwargs["messages"]
+        assert sent_messages[0]["role"] == "system"
+        assert "required_agents" in sent_messages[0]["content"]
+        assert sent_messages[-1] == {"role": "user", "content": "plan"}
+
+    async def test_markdown_fenced_json_is_parsed(self) -> None:
+        adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
+        payload = "```json\n" + json.dumps({"summary": "ok", "required_agents": []}) + "\n```"
+        mock_create = AsyncMock(return_value=make_mock_response(payload))
+        adapter._client = MagicMock()
+        adapter._client.chat.completions.create = mock_create
+
+        result = await adapter.chat(
+            [{"role": "user", "content": "plan"}], response_schema=PlannerSchema
+        )
+
+        assert result["summary"] == "ok"
+
     async def test_schema_mismatch_rejected(self) -> None:
         adapter = OpenCodeAdapter(base_url="http://mock", api_key="test-key", model="test-model")
         payload = json.dumps({"wrong_field": 123})
